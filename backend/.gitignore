@@ -1,0 +1,38 @@
+# Virtual environments
+venv/
+.env/
+env/
+.venv/
+env.bak/
+venv.bak/
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Tests
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+
+# IDEs
+.idea/
+.vscode/
+
+# Local configuration
+.env
+
+# Others
+*.sqlite3
+postgres_data/
+celerybeat-schedule
+*.log

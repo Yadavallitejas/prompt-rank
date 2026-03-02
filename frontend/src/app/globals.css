@@ -1,0 +1,178 @@
+@import "tailwindcss";
+
+/* ─── PromptRank Design Tokens (from UI & Design Doc) ──────────────── */
+
+:root {
+  /* Background / Surface */
+  --pr-bg: #0F1115;
+  --pr-surface: #161B22;
+  --pr-elevated: #1E2430;
+
+  /* Accent */
+  --pr-accent: #2F81F7;
+  --pr-success: #2EA043;
+  --pr-warning: #D29922;
+  --pr-error: #F85149;
+
+  /* Text */
+  --pr-text-primary: #E6EDF3;
+  --pr-text-secondary: #8B949E;
+  --pr-text-muted: #6E7681;
+
+  /* Leaderboard */
+  --pr-gold: #E3B341;
+  --pr-silver: #8B949E;
+  --pr-bronze: #A371F7;
+
+  /* Component tokens */
+  --pr-border: rgba(139, 148, 158, 0.2);
+  --pr-card-radius: 8px;
+  --pr-btn-radius: 6px;
+}
+
+@theme inline {
+  --color-background: var(--pr-bg);
+  --color-foreground: var(--pr-text-primary);
+  --color-surface: var(--pr-surface);
+  --color-elevated: var(--pr-elevated);
+  --color-accent: var(--pr-accent);
+  --color-success: var(--pr-success);
+  --color-warning: var(--pr-warning);
+  --color-error: var(--pr-error);
+  --color-text-secondary: var(--pr-text-secondary);
+  --color-text-muted: var(--pr-text-muted);
+  --color-gold: var(--pr-gold);
+  --color-silver: var(--pr-silver);
+  --color-bronze: var(--pr-bronze);
+  --color-border: var(--pr-border);
+  --font-sans: var(--font-inter);
+  --font-mono: var(--font-jetbrains-mono);
+}
+
+/* ─── Base Styles ──────────────────────────────────────────────────── */
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  color-scheme: dark;
+}
+
+body {
+  background: var(--pr-bg);
+  color: var(--pr-text-primary);
+  font-family: var(--font-inter), 'Inter', system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ─── Scrollbar (dark theme) ───────────────────────────────────────── */
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--pr-bg);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--pr-text-muted);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--pr-text-secondary);
+}
+
+/* ─── Utility Classes ──────────────────────────────────────────────── */
+
+.card {
+  background: var(--pr-surface);
+  border: 1px solid var(--pr-border);
+  border-radius: var(--pr-card-radius);
+  padding: 1.25rem;
+}
+
+.card-elevated {
+  background: var(--pr-elevated);
+  border: 1px solid var(--pr-border);
+  border-radius: var(--pr-card-radius);
+  padding: 1.25rem;
+}
+
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  background: var(--pr-accent);
+  color: #fff;
+  padding: 0.625rem 1.25rem;
+  border-radius: var(--pr-btn-radius);
+  font-weight: 500;
+  font-size: 0.875rem;
+  border: none;
+  cursor: pointer;
+  transition: opacity 0.15s ease, transform 0.1s ease;
+}
+
+.btn-primary:hover {
+  opacity: 0.9;
+}
+
+.btn-primary:active {
+  transform: scale(0.98);
+}
+
+.btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  background: transparent;
+  color: var(--pr-text-primary);
+  padding: 0.625rem 1.25rem;
+  border-radius: var(--pr-btn-radius);
+  font-weight: 500;
+  font-size: 0.875rem;
+  border: 1px solid var(--pr-border);
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.btn-secondary:hover {
+  border-color: var(--pr-accent);
+  box-shadow: 0 0 0 1px rgba(47, 129, 247, 0.15);
+}
+
+/* ─── Tabular Numbers for leaderboard ──────────────────────────────── */
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+  font-family: var(--font-jetbrains-mono), 'JetBrains Mono', monospace;
+}
+
+/* ─── Smooth animations (respect reduced-motion) ──────────────────── */
+
+@media (prefers-reduced-motion: no-preference) {
+  .animate-fade-in {
+    animation: fadeIn 0.4s ease-out;
+  }
+
+  .animate-slide-up {
+    animation: slideUp 0.3s ease-out;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  @keyframes slideUp {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+}

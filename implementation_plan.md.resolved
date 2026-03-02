@@ -1,0 +1,107 @@
+# PromptRank Implementation Plan
+
+Brief description: This document outlines the step-by-step technical implementation plan to build the PromptRank platform, a competitive prompt engineering system, based on the provided PRD, Technical Specification, and UI/Design Document.
+
+## Phase 1: Project Setup & Core Infrastructure (Weeks 1-2)
+- **Initialize Monorepo:** Set up a monorepo structure (e.g., using Turborepo) to host both the Next.js frontend and FastAPI backend.
+- **Backend Setup (Python/FastAPI):**
+    - Set up a FastAPI application structure.
+    - Configure PostgreSQL database connection using SQLAlchemy or asyncpg.
+    - Set up Redis for caching and Celery for the worker queue.
+    - Implement base JWT Authentication endpoints (`/auth/register`, `/auth/login`).
+- **Frontend Setup (Next.js/React):**
+    - Initialize Next.js with TypeScript and Tailwind CSS.
+    - Configure the global design tokens (colors, typography) from the UI Design Doc (Dark theme, Inter/JetBrains Mono fonts).
+    - Setup state management (Zustand or Context API) and API client (Axios/Ky).
+
+## Phase 2: Database & Core Models (Weeks 2-3)
+- **Database Schema:** Define and run migrations (Alembic) for the core tables defined in the Technical Specification:
+    - `users`: id, username, email, password_hash, rating, etc.
+    - `contests`: id, name, timeframes, status, limits, settings.
+    - `problems`: id, statement, schema_json, time limits, scoring config.
+    - `testcases` (hidden): id, input, expected output, adversarial flag.
+    - `submissions` & `runs`: Submission metadata and individual run logs.
+    - `rating_history`: ELO changes per contest.
+- **Model Layer:** Create SQLAlchemy models corresponding to these tables.
+
+## Phase 3: LLM Evaluation Engine & Workers (Weeks 4-6)
+- **Custom Provider Layer:** Implement the `LLMProvider` interface to abstract LLM calls (OpenAI, Anthropic, OpenRouter) allowing deterministic seed injection and fixed parameters.
+- **Worker Setup (Celery/Redis):**
+    - Create Celery worker tasks that pick up queued submissions.
+    - Ensure workers can fetch hidden testcases from DB securely.
+- **Evaluation Loop:**
+    - Implement the N-run sampling loop (MVP: N=5).
+    - Execute the LLM model per testcase with a seeded parameter.
+- **Scoring Engine within Worker:**
+    - Parse responses to ensure *Format Compliance* (strict JSON parsing).
+    - Calculate *Accuracy* (comparing JSON fields against expected output).
+    - Calculate *Token Efficiency* and *Latency*.
+    - Compute *Consistency* across the N runs (variance, Jaccard similarity).
+    - Evaluate *Robustness* flags if adversarial testcases are present.
+    - Aggregate into the Final Score formula and persist to the `submissions` and `runs` tables.
+
+## Phase 4: Backend API & Scoring (Weeks 7-8)
+- **Contest APIs:** 
+    - Endpoints for `GET /contests`, `GET /contests/{id}`, and leaderboards.
+- **Submission APIs:**
+    - `POST /submissions` (enforce rate-limiting, store in DB, and queue Celery task).
+    - `GET /submissions/{id}` and `GET /submissions/{id}/report` to fetch detailed scorecard.
+- **Rating Engine:**
+    - Implement the modified ELO rating system that runs periodically or when a contest ends.
+    - Compute expected vs actual scores and update the `users` and `rating_history` tables.
+
+## Phase 5: Frontend Foundation & UI System (Weeks 9-10)
+- **Component Library Setup:**
+    - Build reusable UI components adhering strictly to the design doc (Cards, Buttons, Tables).
+    - Ensure styling avoids "chat-like" interfaces and focuses on a data-dense, IDE-like feel.
+- **Auth & Dashboard Flows:**
+    - Build Login and Registration pages.
+    - Implement the Dashboard showcasing active/upcoming contests and the User Rating Card (current rating, percentile, mini sparkline).
+
+## Phase 6: Frontend Core Screens (Weeks 11-12)
+- **Contest Page Structure:**
+    - Build the 12-column split layout: Left Panel (Problem Statement, Constraints, Sample I/O) and Right Panel (Prompt Editor).
+    - Implement the Contest Header with a visually dominant countdown timer.
+- **Monaco Editor Integration:**
+    - Integrate `@monaco-editor/react` for the Prompt Editor panel.
+    - Add real-time word/token count estimates.
+    - Implement Submission button with rate-limit checks and confirmation modals.
+- **Submission Results Panel:**
+    - Build a real-time status UI (Queued -> Running -> Evaluated).
+    - Display the Final Score, metric table, and expandable (but sanitized) testcase logs upon completion.
+
+## Phase 7: Real-time Leaderboard & Rating System (Week 13)
+- **Leaderboard UI:**
+    - Build the leaderboard table with column sorting.
+    - Highlight top 3 and current user rows.
+- **WebSockets / SSR Polling:**
+    - Implement real-time leaderboard updates using WebSockets (FastAPI WebSockets + Redis Pub/Sub) or frequent polling.
+    - Ensure soft animations on rank changes without disruptive flashing.
+
+## Phase 8: Anti-Cheat & Admin Panel (Week 14)
+- **Admin Endpoints & UI:**
+    - Pages to manage (CRUD) problems, contests, and hidden testcases.
+    - Tools to freeze contest settings.
+- **Anti-Cheat Mechanics:**
+    - Implement the backend logic for randomized testcase ordering.
+    - Backend anomaly detection (flagging identical prompts or unusual token usage).
+    - IP/Account throttling.
+
+## Phase 9: Testing, Deployment & Pilot (Weeks 15-16)
+- **Infrastructure Setup (AWS MVP):**
+    - Package Frontend, API, and Workers in Docker containers.
+    - Deploy to AWS ECS (API/Worker), RDS (PostgreSQL), and ElastiCache (Redis).
+- **Verification Plan / Automated Tests:**
+    - Write Pytest suites for the Scoring Formulas to verify exact math for Accuracy, Format, Consistency, and ELO calculations.
+    - Integration tests for the full Submission Pipeline (API -> Redis -> Worker -> DB).
+- **Manual Verification & Pilot:**
+    - Run an internal pilot contest with staging testcases and mock competitors.
+    - Verify submission load processing (ensure 95% of submissions evaluated under 2 minutes).
+    - UX verification against the "no-gamified nonsense, IDE-first" design philosophy.
+
+## User Review Required
+None for the plan itself, but if we are to begin code execution, we will need to decide on the starting directory or repository structure, and whether we want to start with Phase 1 immediately in this workspace.
+
+## Summary of Upcoming Tasks
+1. Review this Implementation Plan.
+2. Confirm if we should initialize the monorepo and start laying out the backend and frontend foundation.
