@@ -8,6 +8,7 @@ import { useAuthStore } from "@/stores/authStore";
 const ADMIN_NAV = [
     { href: "/admin", label: "Overview", icon: "📊" },
     { href: "/admin/contests", label: "Contests", icon: "⚔" },
+    { href: "/admin/problems", label: "Practice Problems", icon: "📝" },
 ];
 
 export default function AdminLayout({
@@ -52,8 +53,8 @@ export default function AdminLayout({
                                 key={item.href}
                                 href={item.href}
                                 className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${isActive
-                                        ? "bg-accent/10 text-accent"
-                                        : "text-text-secondary hover:text-foreground hover:bg-elevated/50"
+                                    ? "bg-accent/10 text-accent"
+                                    : "text-text-secondary hover:text-foreground hover:bg-elevated/50"
                                     }`}
                             >
                                 <span>{item.icon}</span>

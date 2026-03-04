@@ -53,3 +53,35 @@ async def get_practice_problem(problem_id: UUID, db: AsyncSession = Depends(get_
     if not problem:
         raise HTTPException(status_code=404, detail="Practice problem not found")
     return problem
+
+
+@router.get("/{problem_id}/sample-testcases")
+async def get_sample_testcases(problem_id: UUID, db: AsyncSession = Depends(get_db)):
+    """
+    Returns up to 2 non-adversarial sample testcases for a practice problem.
+    These are the only testcases visible to regular users — the rest remain hidden.
+    """
+    from app.models import Testcase
+
+    # Verify the problem exists and is a practice problem
+    prob_result = await db.execute(
+        select(Problem).where(Problem.id == problem_id, Problem.is_practice == True)  # noqa: E712
+    )
+    if not prob_result.scalar_one_or_none():
+        raise HTTPException(status_code=404, detail="Practice problem not found")
+
+    result = await db.execute(
+        select(Testcase)
+        .where(Testcase.problem_id == problem_id, Testcase.is_adversarial == False)  # noqa: E712
+        .limit(2)
+    )
+    testcases = result.scalars().all()
+
+    return [
+        {
+            "id": str(tc.id),
+            "input_blob": tc.input_blob,
+            "expected_output_blob": tc.expected_output_blob,
+        }
+        for tc in testcases
+    ]

@@ -101,9 +101,17 @@ class TestcaseCreate(BaseModel):
     is_adversarial: bool = False
 
 
+class TestcaseUpdate(BaseModel):
+    input_blob: Optional[str] = None
+    expected_output_blob: Optional[str] = None
+    is_adversarial: Optional[bool] = None
+
+
 class TestcaseOut(BaseModel):
     id: UUID
     problem_id: UUID
+    input_blob: str
+    expected_output_blob: str
     is_adversarial: bool
 
     model_config = {"from_attributes": True}

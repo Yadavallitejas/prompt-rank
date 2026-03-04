@@ -21,23 +21,35 @@ interface Submission {
     created_at: string;
 }
 
+interface PracticeProblem {
+    id: string;
+    title: string;
+    difficulty: string;
+    statement: string;
+    time_limit_sec: number;
+}
+
 export default function DashboardPage() {
     const { user } = useAuthStore();
     const [contests, setContests] = useState<Contest[]>([]);
     const [submissions, setSubmissions] = useState<Submission[]>([]);
+    const [practiceProblems, setPracticeProblems] = useState<PracticeProblem[]>([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         async function load() {
             try {
-                const [contestsRes, subsRes] = await Promise.allSettled([
+                const [contestsRes, subsRes, practiceRes] = await Promise.allSettled([
                     api.get("/contests"),
                     api.get("/submissions/my"),
+                    api.get("/problems"),
                 ]);
                 if (contestsRes.status === "fulfilled")
                     setContests(contestsRes.value.data.slice(0, 5));
                 if (subsRes.status === "fulfilled")
                     setSubmissions(subsRes.value.data.slice(0, 10));
+                if (practiceRes.status === "fulfilled")
+                    setPracticeProblems(practiceRes.value.data);
             } finally {
                 setLoading(false);
             }
@@ -51,6 +63,15 @@ export default function DashboardPage() {
         if (s === "running" || s === "queued") return "text-warning";
         if (s === "failed") return "text-error";
         return "text-text-muted";
+    };
+
+    const diffBadge = (d: string) => {
+        const styles: Record<string, string> = {
+            easy: "bg-success/15 text-success border-success/30",
+            medium: "bg-warning/15 text-warning border-warning/30",
+            hard: "bg-error/15 text-error border-error/30",
+        };
+        return styles[d] || styles.medium;
     };
 
     return (
@@ -146,10 +167,63 @@ export default function DashboardPage() {
                 </section>
             </div>
 
+            {/* Practice Problems */}
+            <section className="mt-8">
+                <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-lg font-semibold">Practice Problems</h2>
+                    <Link
+                        href="/practice"
+                        className="text-xs text-accent hover:underline"
+                    >
+                        View all
+                    </Link>
+                </div>
+                {loading ? (
+                    <p className="text-sm text-text-muted">Loading...</p>
+                ) : practiceProblems.length === 0 ? (
+                    <p className="text-sm text-text-muted">
+                        No practice problems available yet.
+                    </p>
+                ) : (
+                    <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-thin">
+                        {practiceProblems.map((p) => (
+                            <Link
+                                key={p.id}
+                                href={`/practice/${p.id}`}
+                                className="card flex-shrink-0 w-64 block transition-all hover:border-accent/30 hover:shadow-lg hover:shadow-accent/5"
+                            >
+                                <div className="flex items-start justify-between mb-2">
+                                    <h3 className="text-sm font-semibold truncate flex-1 mr-2">
+                                        {p.title}
+                                    </h3>
+                                    <span
+                                        className={`inline-flex shrink-0 text-[10px] font-medium px-2 py-0.5 rounded-full border capitalize ${diffBadge(
+                                            p.difficulty
+                                        )}`}
+                                    >
+                                        {p.difficulty}
+                                    </span>
+                                </div>
+                                <p className="text-xs text-text-muted line-clamp-2">
+                                    {p.statement.slice(0, 100)}
+                                    {p.statement.length > 100 ? "…" : ""}
+                                </p>
+                                <p className="mt-2 text-[10px] text-text-muted">
+                                    Time limit: {p.time_limit_sec}s
+                                </p>
+                            </Link>
+                        ))}
+                    </div>
+                )}
+            </section>
+
             {/* Quick Actions */}
             <div className="mt-8 flex gap-4">
                 <Link href="/contests" className="btn-primary">
                     Browse Contests
+                </Link>
+                <Link href="/practice" className="btn-secondary">
+                    Practice Problems
                 </Link>
                 <Link href="/leaderboard" className="btn-secondary">
                     View Leaderboard

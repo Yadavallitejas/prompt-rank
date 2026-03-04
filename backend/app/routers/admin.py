@@ -26,7 +26,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.models import Contest, Problem, Testcase, User, Submission
-from app.schemas import ContestCreate, ContestOut, ProblemCreate, ProblemOut, TestcaseCreate, TestcaseOut
+from app.schemas import ContestCreate, ContestOut, ProblemCreate, ProblemOut, TestcaseCreate, TestcaseOut, TestcaseUpdate
 from app.auth import get_current_admin
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -174,6 +174,27 @@ async def delete_testcase(
         raise HTTPException(status_code=404, detail="Testcase not found")
     await db.delete(testcase)
     await db.commit()
+
+
+@router.put("/testcases/{testcase_id}", response_model=TestcaseOut)
+async def update_testcase(
+    testcase_id: UUID,
+    payload: TestcaseUpdate,
+    db: AsyncSession = Depends(get_db),
+    admin: User = Depends(get_current_admin),
+):
+    result = await db.execute(select(Testcase).where(Testcase.id == testcase_id))
+    testcase = result.scalar_one_or_none()
+    if not testcase:
+        raise HTTPException(status_code=404, detail="Testcase not found")
+
+    update_data = payload.model_dump(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(testcase, field, value)
+
+    await db.commit()
+    await db.refresh(testcase)
+    return testcase
 
 
 # ── Dashboard Stats ──────────────────────────────────────────────────────────

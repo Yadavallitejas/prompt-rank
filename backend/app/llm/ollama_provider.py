@@ -10,11 +10,13 @@ NOT intended for production contests — use OpenAI for that.
 
 import time
 import httpx
+import logging
 
 from app.config import get_settings
 from app.llm.base import LLMProvider, LLMResponse
 
 settings = get_settings()
+logger = logging.getLogger(__name__)
 
 
 class OllamaProvider(LLMProvider):
@@ -23,6 +25,36 @@ class OllamaProvider(LLMProvider):
     def __init__(self) -> None:
         self.base_url = settings.ollama_base_url.rstrip("/")
         self.default_model = settings.ollama_default_model
+        self._verify_model_available()
+
+    def _verify_model_available(self) -> None:
+        """Check that the configured model is pulled in Ollama. Logs a clear warning if not."""
+        try:
+            resp = httpx.get(f"{self.base_url}/api/tags", timeout=5.0)
+            resp.raise_for_status()
+            available = [m["name"] for m in resp.json().get("models", [])]
+            # Normalise: ollama list shows "llama3.1:8b", payload uses same
+            if not any(
+                self.default_model == name or self.default_model.split(":")[0] == name.split(":")[0]
+                for name in available
+            ):
+                logger.warning(
+                    "[OllamaProvider] Model '%s' is NOT available in Ollama. "
+                    "Pull it first: `ollama pull %s`. "
+                    "Available models: %s",
+                    self.default_model,
+                    self.default_model,
+                    available,
+                )
+            else:
+                logger.info("[OllamaProvider] Model '%s' is available ✓", self.default_model)
+        except Exception as exc:
+            logger.warning(
+                "[OllamaProvider] Could not connect to Ollama at %s: %s. "
+                "Make sure Ollama is running on the host.",
+                self.base_url,
+                exc,
+            )
 
     async def run(
         self,
@@ -34,7 +66,11 @@ class OllamaProvider(LLMProvider):
         seed: int = 42,
         max_tokens: int = 2048,
     ) -> LLMResponse:
-        target_model = model or self.default_model
+        # Overwrite remote model requests (e.g. gpt-4o-mini) with the local ollama model
+        if model and ("gpt" in model.lower() or "claude" in model.lower() or "o1" in model.lower()):
+            target_model = self.default_model
+        else:
+            target_model = model or self.default_model
 
         payload = {
             "model": target_model,

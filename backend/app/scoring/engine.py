@@ -176,6 +176,10 @@ def _compute_consistency(outputs: list[str]) -> float:
     Average pairwise Jaccard similarity of outputs.
     High similarity = high consistency.
     """
+    # All empty outputs (e.g. all LLM errors) → no meaningful consistency
+    non_empty = [o for o in outputs if o.strip()]
+    if not non_empty:
+        return 0.0
     if len(outputs) <= 1:
         return 1.0
 
@@ -281,11 +285,14 @@ def score_submission(testcase_results: list[TestcaseResult]) -> ScoringResult:
     consistency = sum(all_consistencies) / len(all_consistencies) if all_consistencies else 0.0
 
     # Token efficiency: normalized (lower = better)
-    if all_tokens and max(all_tokens) > min(all_tokens):
+    if all_tokens and sum(all_tokens) == 0:
+        # All runs errored (tokens_used=0) → worst efficiency, no credit
+        t_norm = 1.0
+    elif all_tokens and max(all_tokens) > min(all_tokens):
         avg_tokens = sum(all_tokens) / len(all_tokens)
         t_norm = (avg_tokens - min(all_tokens)) / (max(all_tokens) - min(all_tokens))
     else:
-        t_norm = 0.0  # All equal → best score
+        t_norm = 0.0  # All equal non-zero → best score
 
     # Latency: normalized (lower = better)
     if all_latencies and max(all_latencies) > min(all_latencies):
@@ -298,7 +305,7 @@ def score_submission(testcase_results: list[TestcaseResult]) -> ScoringResult:
     robustness = (
         sum(adversarial_accuracies) / len(adversarial_accuracies)
         if adversarial_accuracies
-        else accuracy  # Fallback: use overall accuracy if no adversarial cases
+        else 0.0  # No adversarial cases → no robustness credit
     )
 
     # ── Final Score ──────────────────────────────────────────

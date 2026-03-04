@@ -38,7 +38,7 @@ interface AuthState {
     logout: () => void;
 
     /** Hydrate token from localStorage on mount */
-    hydrate: () => void;
+    hydrate: () => Promise<void>;
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({
@@ -89,11 +89,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         set({ user: null, token: null });
     },
 
-    hydrate: () => {
+    hydrate: async () => {
         const token = localStorage.getItem("pr_token");
         if (token) {
             set({ token });
-            get().fetchMe();
+            await get().fetchMe();
         }
     },
 }));
