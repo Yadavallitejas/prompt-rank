@@ -14,6 +14,20 @@ interface MetricBreakdown {
     token_efficiency?: number;
     latency?: number;
     robustness?: number;
+    leakage_detected?: boolean;
+    leakage_overlap?: number;
+    prompt_evaluation?: PromptEvaluation;
+}
+
+interface PromptEvaluation {
+    dimension_scores: Record<string, number>;
+    manipulation_detected: string[];
+    penalty_points: number;
+    quality_percentage: number;
+    final_score: number;
+    grade: string;
+    evaluation_summary: string;
+    error?: string;
 }
 
 interface SubmissionData {
@@ -33,6 +47,23 @@ const METRIC_LABELS: Record<string, { label: string; weight: string }> = {
     token_efficiency: { label: "Tokens", weight: "10%" },
     robustness: { label: "Robustness", weight: "10%" },
     latency: { label: "Latency", weight: "5%" },
+};
+
+const EVAL_DIM_LABELS: Record<string, string> = {
+    task_clarity: "Task Clarity",
+    structure: "Structure",
+    context_quality: "Context Quality",
+    output_specification: "Output Spec",
+    robustness: "Robustness",
+    safety_security: "Safety & Security",
+};
+
+const GRADE_COLORS: Record<string, string> = {
+    A: "text-green-400",
+    B: "text-blue-400",
+    C: "text-yellow-400",
+    D: "text-orange-400",
+    F: "text-red-400",
 };
 
 export default function SubmissionTracker({
@@ -91,6 +122,8 @@ export default function SubmissionTracker({
         data.status as (typeof STEPS)[number]
     );
     const isFailed = data.status === "failed";
+    const leakageDetected = data.metrics_json?.leakage_detected;
+    const promptEval = data.metrics_json?.prompt_evaluation;
 
     return (
         <div className="space-y-4">
@@ -109,10 +142,10 @@ export default function SubmissionTracker({
                             )}
                             <div
                                 className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition-all ${isActive
-                                        ? "bg-accent/15 text-accent ring-1 ring-accent/30"
-                                        : isComplete
-                                            ? "bg-success/15 text-success"
-                                            : "bg-surface text-text-muted"
+                                    ? "bg-accent/15 text-accent ring-1 ring-accent/30"
+                                    : isComplete
+                                        ? "bg-success/15 text-success"
+                                        : "bg-surface text-text-muted"
                                     }`}
                             >
                                 {isActive && data.status !== "evaluated" && (
@@ -137,9 +170,26 @@ export default function SubmissionTracker({
             {/* Results — only when evaluated */}
             {data.status === "evaluated" && data.final_score !== null && (
                 <div className="space-y-3 animate-fade-in">
+                    {/* Leakage Warning */}
+                    {leakageDetected && (
+                        <div className="rounded-md bg-error/10 border border-error/30 px-3 py-2 text-sm text-error flex items-center gap-2">
+                            <span className="text-lg">⚠️</span>
+                            <div>
+                                <p className="font-semibold">Test Case Leakage Detected</p>
+                                <p className="text-xs text-error/80">
+                                    Your prompt contains content copied from expected test case outputs.
+                                    Score has been penalized to 0.
+                                    {data.metrics_json?.leakage_overlap !== undefined && (
+                                        <> Overlap: {(data.metrics_json.leakage_overlap * 100).toFixed(0)}%</>
+                                    )}
+                                </p>
+                            </div>
+                        </div>
+                    )}
+
                     {/* Final Score */}
                     <div className="flex items-baseline gap-3">
-                        <span className="text-3xl font-bold tabular-nums text-accent">
+                        <span className={`text-3xl font-bold tabular-nums ${leakageDetected ? "text-error" : "text-accent"}`}>
                             {data.final_score.toFixed(2)}
                         </span>
                         <span className="text-sm text-text-muted">/ 100</span>
@@ -172,13 +222,67 @@ export default function SubmissionTracker({
                                                     {meta.weight}
                                                 </td>
                                                 <td className="px-3 py-2 text-right tabular-nums font-semibold text-accent">
-                                                    {val !== undefined ? (val * 100).toFixed(1) : "—"}
+                                                    {typeof val === "number" ? (val * 100).toFixed(1) : "—"}
                                                 </td>
                                             </tr>
                                         );
                                     })}
                                 </tbody>
                             </table>
+                        </div>
+                    )}
+
+                    {/* Prompt Quality Evaluation */}
+                    {promptEval && !promptEval.error && (
+                        <div className="rounded-md border border-border overflow-hidden">
+                            {/* Header */}
+                            <div className="bg-surface px-3 py-2 flex items-center justify-between">
+                                <span className="text-xs uppercase tracking-wider text-text-muted font-medium">
+                                    Prompt Quality Evaluation
+                                </span>
+                                <span className={`text-lg font-bold ${GRADE_COLORS[promptEval.grade] || "text-text-muted"}`}>
+                                    {promptEval.grade}
+                                </span>
+                            </div>
+
+                            {/* Dimension Scores */}
+                            <table className="w-full text-sm">
+                                <tbody className="divide-y divide-border/50">
+                                    {Object.entries(promptEval.dimension_scores).map(([key, score]) => (
+                                        <tr key={key} className="hover:bg-elevated/30 transition-colors">
+                                            <td className="px-3 py-1.5 font-medium">
+                                                {EVAL_DIM_LABELS[key] || key}
+                                            </td>
+                                            <td className="px-3 py-1.5 text-right tabular-nums font-semibold text-accent">
+                                                {score} / 20
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+
+                            {/* Manipulation Warning */}
+                            {promptEval.manipulation_detected.length > 0 && (
+                                <div className="bg-error/5 border-t border-error/20 px-3 py-2">
+                                    <p className="text-xs font-semibold text-error mb-1">
+                                        ⚠ Manipulation Detected ({promptEval.penalty_points} penalty pts)
+                                    </p>
+                                    <ul className="text-xs text-error/80 list-disc list-inside">
+                                        {promptEval.manipulation_detected.map((m, i) => (
+                                            <li key={i}>{m}</li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            )}
+
+                            {/* Summary */}
+                            {promptEval.evaluation_summary && (
+                                <div className="border-t border-border/50 px-3 py-2">
+                                    <p className="text-xs text-text-muted leading-relaxed">
+                                        {promptEval.evaluation_summary}
+                                    </p>
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>

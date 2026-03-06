@@ -27,6 +27,7 @@ from app.scoring.engine import (
     TestcaseResult,
     RunResult,
 )
+from app.scoring.prompt_evaluator import evaluate_prompt_quality
 
 settings = get_settings()
 
@@ -197,12 +198,32 @@ def evaluate_submission(self, submission_id: str):
 
             testcase_results.append(tc_result)
 
-        # ── 7. Compute scores ────────────────────────────────
-        scoring_result = score_submission(testcase_results)
+        # ── 7. Compute scores (with leakage detection) ────────
+        scoring_result = score_submission(
+            testcase_results,
+            prompt_text=submission.prompt_text,
+        )
+
+        # ── 7b. LLM-based prompt quality evaluation ──────────
+        prompt_eval = None
+        try:
+            prompt_eval = _run_async(
+                evaluate_prompt_quality(
+                    llm=llm,
+                    prompt_text=submission.prompt_text,
+                    problem_statement=problem.statement,
+                    model=model,
+                )
+            )
+        except Exception:
+            pass  # Non-critical: don't fail submission on eval errors
 
         # ── 8. Persist results ───────────────────────────────
+        metrics = scoring_result.to_dict()
+        if prompt_eval is not None:
+            metrics["prompt_evaluation"] = prompt_eval.to_dict()
         submission.final_score = scoring_result.final_score
-        submission.metrics_json = scoring_result.to_dict()
+        submission.metrics_json = metrics
         submission.status = SubmissionStatus.evaluated
         db.commit()
 
