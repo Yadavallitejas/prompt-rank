@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
 import { useAuthStore } from "@/stores/authStore";
 import api from "@/lib/api";
@@ -16,6 +16,10 @@ interface Contest {
 interface Submission {
     id: string;
     problem_id: string;
+    problem_title: string;
+    contest_id: string | null;
+    contest_name: string | null;
+    version: number;
     status: string;
     final_score: number | null;
     created_at: string;
@@ -33,8 +37,31 @@ export default function DashboardPage() {
     const { user } = useAuthStore();
     const [contests, setContests] = useState<Contest[]>([]);
     const [submissions, setSubmissions] = useState<Submission[]>([]);
+    const [showAllSubs, setShowAllSubs] = useState(false);
     const [practiceProblems, setPracticeProblems] = useState<PracticeProblem[]>([]);
     const [loading, setLoading] = useState(true);
+
+    const solvedProblems = useMemo<{ id: string, title: string }[]>(() => {
+        const solved = submissions.filter(s => s.final_score !== null && s.final_score > 75 && !s.contest_id);
+        const unique = new Map();
+        for (const s of solved) {
+            if (!unique.has(s.problem_id)) {
+                unique.set(s.problem_id, { id: s.problem_id, title: s.problem_title });
+            }
+        }
+        return Array.from(unique.values());
+    }, [submissions]);
+
+    const participatedContests = useMemo<{ id: string, name: string }[]>(() => {
+        const participated = submissions.filter(s => s.contest_id);
+        const unique = new Map();
+        for (const s of participated) {
+            if (!unique.has(s.contest_id)) {
+                unique.set(s.contest_id, { id: s.contest_id, name: s.contest_name || "Contest" });
+            }
+        }
+        return Array.from(unique.values());
+    }, [submissions]);
 
     useEffect(() => {
         async function load() {
@@ -47,7 +74,7 @@ export default function DashboardPage() {
                 if (contestsRes.status === "fulfilled")
                     setContests(contestsRes.value.data.slice(0, 5));
                 if (subsRes.status === "fulfilled")
-                    setSubmissions(subsRes.value.data.slice(0, 10));
+                    setSubmissions(subsRes.value.data);
                 if (practiceRes.status === "fulfilled")
                     setPracticeProblems(practiceRes.value.data);
             } finally {
@@ -128,6 +155,12 @@ export default function DashboardPage() {
                 <section className="card">
                     <div className="flex items-center justify-between mb-4">
                         <h2 className="text-lg font-semibold">My Submissions</h2>
+                        <Link
+                            href="/submissions"
+                            className="text-xs text-accent hover:underline"
+                        >
+                            View all
+                        </Link>
                     </div>
                     {loading ? (
                         <p className="text-sm text-text-muted">Loading...</p>
@@ -137,14 +170,14 @@ export default function DashboardPage() {
                         </p>
                     ) : (
                         <div className="space-y-2">
-                            {submissions.map((s) => (
+                            {(showAllSubs ? submissions : submissions.slice(0, 5)).map((s) => (
                                 <div
                                     key={s.id}
                                     className="flex items-center justify-between rounded-md px-3 py-2 hover:bg-elevated transition-colors"
                                 >
                                     <div>
                                         <p className="text-sm font-medium truncate max-w-[200px]">
-                                            {s.id.slice(0, 8)}...
+                                            {s.problem_title} <span className="text-xs text-text-muted font-normal">(v{s.version})</span>
                                         </p>
                                         <p className="text-xs text-text-muted">
                                             {new Date(s.created_at).toLocaleDateString()}
@@ -155,13 +188,34 @@ export default function DashboardPage() {
                                             {s.status}
                                         </p>
                                         {s.final_score !== null && (
-                                            <p className="text-sm tabular-nums font-semibold text-accent">
-                                                {s.final_score.toFixed(1)}
-                                            </p>
+                                            <div className="flex flex-col items-end">
+                                                <p className="text-sm tabular-nums font-semibold text-accent">
+                                                    {s.final_score.toFixed(1)}
+                                                </p>
+                                                <p className={`text-[10px] uppercase font-bold tracking-wider ${s.final_score > 75 ? 'text-success' : s.final_score >= 50 ? 'text-warning' : 'text-error'}`}>
+                                                    {s.final_score > 75 ? "Fully verified" : s.final_score >= 50 ? "Partially verified" : "Failed"}
+                                                </p>
+                                            </div>
                                         )}
                                     </div>
                                 </div>
                             ))}
+                            {submissions.length > 5 && !showAllSubs && (
+                                <button
+                                    onClick={() => setShowAllSubs(true)}
+                                    className="w-full text-center text-xs text-accent hover:underline py-2"
+                                >
+                                    View more
+                                </button>
+                            )}
+                            {showAllSubs && submissions.length > 5 && (
+                                <button
+                                    onClick={() => setShowAllSubs(false)}
+                                    className="w-full text-center text-xs text-accent hover:underline py-2"
+                                >
+                                    View less
+                                </button>
+                            )}
                         </div>
                     )}
                 </section>
@@ -216,6 +270,63 @@ export default function DashboardPage() {
                     </div>
                 )}
             </section>
+
+            {/* User History */}
+            <div className="grid gap-6 lg:grid-cols-2 mt-8">
+                {/* Solved Problems */}
+                <section className="card flex flex-col">
+                    <h2 className="text-lg font-semibold mb-4">Solved Problems</h2>
+                    {loading ? (
+                        <p className="text-sm text-text-muted">Loading...</p>
+                    ) : solvedProblems.length === 0 ? (
+                        <div className="flex-1 flex items-center justify-center py-6 text-center">
+                            <p className="text-sm text-text-muted">No solved problems yet. Practice more to show up here!</p>
+                        </div>
+                    ) : (
+                        <div className="space-y-2">
+                            {solvedProblems.map(p => (
+                                <Link
+                                    key={p.id}
+                                    href={`/practice/${p.id}`}
+                                    className="flex items-center justify-between rounded-md px-3 py-2 hover:bg-elevated transition-colors border border-transparent hover:border-success/30"
+                                >
+                                    <span className="text-sm font-medium">{p.title}</span>
+                                    <span className="text-[10px] font-bold uppercase tracking-wider text-success">
+                                        Fully verified
+                                    </span>
+                                </Link>
+                            ))}
+                        </div>
+                    )}
+                </section>
+
+                {/* Participated Contests */}
+                <section className="card flex flex-col">
+                    <h2 className="text-lg font-semibold mb-4">Participated Contests</h2>
+                    {loading ? (
+                        <p className="text-sm text-text-muted">Loading...</p>
+                    ) : participatedContests.length === 0 ? (
+                        <div className="flex-1 flex items-center justify-center py-6 text-center">
+                            <p className="text-sm text-text-muted">No contests participated yet. Join one now!</p>
+                        </div>
+                    ) : (
+                        <div className="space-y-2">
+                            {participatedContests.map(c => (
+                                <Link
+                                    key={c.id}
+                                    href={`/contests/${c.id}`}
+                                    className="flex items-center justify-between rounded-md px-3 py-2 hover:bg-elevated transition-colors border border-transparent hover:border-accent/30"
+                                >
+                                    <span className="text-sm font-medium">{c.name}</span>
+                                    <span className="text-[10px] font-bold uppercase tracking-wider text-accent">
+                                        View
+                                    </span>
+                                </Link>
+                            ))}
+                        </div>
+                    )}
+                </section>
+            </div>
 
             {/* Quick Actions */}
             <div className="mt-8 flex gap-4">

@@ -7,6 +7,7 @@ import { useAuthStore } from "@/stores/authStore";
 import api from "@/lib/api";
 import CountdownTimer from "@/components/CountdownTimer";
 import SubmissionTracker from "@/components/SubmissionTracker";
+import MySubmissions from "@/components/MySubmissions";
 import { useLeaderboardStream } from "@/hooks/useLeaderboardStream";
 
 // Lazy-load Monaco to avoid SSR issues
@@ -290,6 +291,13 @@ export default function ContestDetailPage() {
                                         </pre>
                                     </div>
                                 )}
+
+                                {/* My Submissions */}
+                                <MySubmissions
+                                    problemId={selectedProblem.id}
+                                    contestId={contestId}
+                                    refreshTrigger={trackedSubmissionId}
+                                />
                             </div>
                         ) : (
                             <div className="flex items-center justify-center h-full">
@@ -395,8 +403,8 @@ export default function ContestDetailPage() {
                         {/* Live indicator */}
                         <div className="flex justify-end mb-3">
                             <div className={`flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium border ${lbIsLive
-                                    ? "bg-success/10 border-success/30 text-success"
-                                    : "bg-text-muted/10 border-text-muted/30 text-text-muted"
+                                ? "bg-success/10 border-success/30 text-success"
+                                : "bg-text-muted/10 border-text-muted/30 text-text-muted"
                                 }`}>
                                 {lbIsLive && (
                                     <span className="relative flex h-2 w-2">

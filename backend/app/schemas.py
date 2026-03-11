@@ -140,6 +140,28 @@ class SubmissionOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+# ── Submission History ───────────────────────────────────────────────────────
+
+class SubmissionHistoryItem(BaseModel):
+    id: UUID
+    user_id: UUID
+    problem_id: UUID
+    contest_id: Optional[UUID]
+    prompt_text: str
+    version: int
+    status: SubmissionStatus
+    final_score: Optional[float]
+    metrics_json: Optional[dict]
+    created_at: datetime
+    problem_title: str
+    contest_name: Optional[str] = None
+    is_practice: bool
+    total_runs: int = 0
+    passed_runs: int = 0
+
+    model_config = {"from_attributes": True}
+
+
 # ── Submission Report ────────────────────────────────────────────────────────
 
 class RunOut(BaseModel):

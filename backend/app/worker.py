@@ -19,7 +19,7 @@ from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker, Session
 
 from app.config import get_settings
-from app.models import Submission, Problem, Testcase, Run, Contest, SubmissionStatus
+from app.models import Submission, Problem, Testcase, Run, Contest, SubmissionStatus, User
 from app.database import Base
 from app.llm.factory import get_llm_provider
 from app.scoring.engine import (
@@ -218,13 +218,57 @@ def evaluate_submission(self, submission_id: str):
         except Exception:
             pass  # Non-critical: don't fail submission on eval errors
 
-        # ── 8. Persist results ───────────────────────────────
+        # ── 8. Persist results & Award Points ───────────────────────────────
         metrics = scoring_result.to_dict()
         if prompt_eval is not None:
             metrics["prompt_evaluation"] = prompt_eval.to_dict()
-        submission.final_score = scoring_result.final_score
+        
+        final_score = scoring_result.final_score
+        submission.final_score = final_score
         submission.metrics_json = metrics
         submission.status = SubmissionStatus.evaluated
+        
+        # Calculate points gained based on score and difficulty
+        points_map = {"easy": 10, "medium": 20, "hard": 30}
+        diff = getattr(problem, "difficulty", "medium") or "medium"
+        max_points = points_map.get(diff.lower(), 20)
+        
+        if final_score > 75:
+            multiplier = 1.0 # Fully verified
+        elif final_score >= 50:
+            multiplier = 0.5 # Partially verified
+        else:
+            multiplier = 0.0 # Failed
+            
+        points_earned = int(max_points * multiplier)
+        
+        if points_earned > 0:
+            # Fetch user's prior best score for this problem to only award net new points
+            from sqlalchemy import func
+            prior_best_score = db.execute(
+                select(func.max(Submission.final_score))
+                .where(
+                    Submission.user_id == submission.user_id,
+                    Submission.problem_id == submission.problem_id,
+                    Submission.id != submission.id,
+                    Submission.final_score.isnot(None)
+                )
+            ).scalar() or 0
+            
+            prior_multiplier = 0.0
+            if prior_best_score > 75:
+                prior_multiplier = 1.0
+            elif prior_best_score >= 50:
+                prior_multiplier = 0.5
+                
+            prior_points_earned = int(max_points * prior_multiplier)
+            net_points = points_earned - prior_points_earned
+            
+            if net_points > 0:
+                user = db.execute(select(User).where(User.id == submission.user_id)).scalar_one_or_none()
+                if user:
+                    user.rating += net_points
+
         db.commit()
 
         # ── 9. Publish leaderboard update via Redis Pub/Sub ──

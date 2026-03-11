@@ -6,6 +6,7 @@ import dynamic from "next/dynamic";
 import { useAuthStore } from "@/stores/authStore";
 import api from "@/lib/api";
 import SubmissionTracker from "@/components/SubmissionTracker";
+import MySubmissions from "@/components/MySubmissions";
 
 const Editor = dynamic(() => import("@monaco-editor/react"), { ssr: false });
 
@@ -252,6 +253,11 @@ export default function PracticeDetailPage() {
                                 </div>
                             </div>
                         )}
+                        {/* My Submissions */}
+                        <MySubmissions
+                            problemId={problemId}
+                            refreshTrigger={trackedSubmissionId}
+                        />
                     </div>
                 </div>
 
